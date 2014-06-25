@@ -13,8 +13,10 @@ class Builder
 		trace("Genericbuild");
 		var t = Context.getLocalType();
 		var typeName:String = "";
+		var classType:ClassType;
 		switch(t) {
 			case TInst(t, p):
+				classType = t.get();
 				switch(p[0]) {
 					case TInst(t2, p2):
 						typeName = ""+t2;
@@ -23,8 +25,13 @@ class Builder
 			default:
 		}
 		
-		var fields = Context.getBuildFields();
-		trace(t);
+		for (i in classType.fields.get()) {
+			switch(i) {
+				case _ => f:
+					if (f.name == "name") {
+					}
+			}
+		}
 		
 		return t;
 	}
