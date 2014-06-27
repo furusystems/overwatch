@@ -1,6 +1,7 @@
 package overwatch;
 import haxe.macro.Context;
 import haxe.macro.Expr;
+import haxe.macro.ExprTools;
 
 enum OWLogLevel {
 	DEBUG;
@@ -32,7 +33,8 @@ abstract EventUtil(OWLogEvent) from OWLogEvent {
 class Log
 {
 	public static var binding:LogBinding = new DefaultBinding();
-	macro public static function debug(input:String):Expr {
+	macro public static function debug(input:Expr):Expr {
+		
 		return buildEvent(input, DEBUG);
 	}
 	macro public static function info(input:String):Expr {
@@ -48,15 +50,17 @@ class Log
 		return buildEvent(input, FATAL);
 	}
 	#if macro
-	static inline function buildEvent(input:String, level:OWLogLevel):Expr {
+	static function buildEvent(input:Expr, level:OWLogLevel):Expr {
+		
 		var name = Context.getLocalClass().get().name;
-		return macro {
-			var owLogTime = Date.now().getTime();
-			var event = overwatch.OWLogEvent.Message($v { name }, $v { level }, $v { input }, owLogTime );
-			overwatch.Log.binding.handleLogEvent(event);
-			var util = new overwatch.EventUtil(event);
-			util;
-		}
+		var str = ExprTools.toString(input);
+			return macro {
+				var owLogTime = Date.now().getTime();
+				var event = overwatch.OWLogEvent.Message($v { name }, $v { level }, $input, owLogTime );
+				overwatch.Log.binding.handleLogEvent(event);
+				var util = new overwatch.EventUtil(event);
+				util;
+			}
 	}
 	#end
 	
