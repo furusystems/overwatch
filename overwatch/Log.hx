@@ -34,24 +34,22 @@ class Log
 {
 	public static var binding:LogBinding = new DefaultBinding();
 	macro public static function debug(input:Expr):Expr {
-		
 		return buildEvent(input, DEBUG);
 	}
-	macro public static function info(input:String):Expr {
+	macro public static function info(input:Expr):Expr {
 		return buildEvent(input, INFO);
 	}
-	macro public static function warn(input:String):Expr {
+	macro public static function warn(input:Expr):Expr {
 		return buildEvent(input, WARNING);
 	}
-	macro public static function error(input:String):Expr {
+	macro public static function error(input:Expr):Expr {
 		return buildEvent(input, ERROR);
 	}
-	macro public static function fatal(input:String):Expr {
+	macro public static function fatal(input:Expr):Expr {
 		return buildEvent(input, FATAL);
 	}
 	#if macro
 	static function buildEvent(input:Expr, level:OWLogLevel):Expr {
-		
 		var name = Context.getLocalClass().get().name;
 		var str = ExprTools.toString(input);
 			return macro {
