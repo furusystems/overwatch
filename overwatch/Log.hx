@@ -1,34 +1,8 @@
 package overwatch;
+import haxe.macro.Context;
 import haxe.macro.Expr;
 
-/**
- * ...
- * @author Andreas Rønning
- */
-
-@:remove @:genericBuild(overwatch.macro.Builder.build()) abstract Logger<T>(Void) {
-	//var name:String;
-	public inline function new() {
-		
-	}
-	macro public inline function debug(input:String):Expr {
-		Log.debug(name, input);
-	}
-	macro public inline function info(input:String):Expr {
-		Log.info(name, input);
-	}
-	macro public inline function warn(input:String):Expr {
-		Log.warn(name, input);
-	}
-	macro public inline function error(input:String):Expr {
-		Log.error(name, input);
-	}
-	macro public inline function fatal(input:String):Expr {
-		Log.fatal(name, input);
-	}
-}
-
-enum LogLevel {
+enum OWLogLevel {
 	DEBUG;
 	INFO;
 	WARNING;
@@ -36,43 +10,75 @@ enum LogLevel {
 	FATAL;
 }
 
-@:allow(overwatch)
+enum OWLogEvent {
+	Message(className:String, level:OWLogLevel, value:String, time:Float, ?meta:Array<Dynamic>);
+}
+
+abstract EventUtil(OWLogEvent) from OWLogEvent {
+	public inline function new(evt:OWLogEvent) {
+		this = evt;
+	}
+	public inline function addMeta(data:Dynamic):EventUtil {
+		{
+			var array:Array<Dynamic> = this.getParameters()[5];
+			if (array == null) {
+				this.getParameters()[5] = array = [];
+			}
+			array.push(data);
+		}
+		return this;
+	}
+}
 class Log
 {
-	static var binding:LogBinding = new DefaultBinding();
-	public static function bind(b:LogBinding) {
-		if (b == null) throw "Null binding not permitted";
-		binding = b;
+	public static var binding:LogBinding = new DefaultBinding();
+	macro public static function debug(input:String):Expr {
+		return buildEvent(input, DEBUG);
 	}
-	static inline function debug(src:String, input:String):Void {
-		binding.print(src, DEBUG, input);
+	macro public static function info(input:String):Expr {
+		return buildEvent(input, INFO);
 	}
-	static inline function info(src:String, input:String):Void {
-		binding.print(src, INFO, input);
+	macro public static function warn(input:String):Expr {
+		return buildEvent(input, WARNING);
 	}
-	static inline function warn(src:String, input:String):Void {
-		binding.print(src, WARNING, input);
+	macro public static function error(input:String):Expr {
+		return buildEvent(input, ERROR);
 	}
-	static inline function error(src:String, input:String):Void {
-		binding.print(src, ERROR, input);
+	macro public static function fatal(input:String):Expr {
+		return buildEvent(input, FATAL);
 	}
-	static inline function fatal(src:String, input:String):Void {
-		binding.print(src, FATAL, input);
+	#if macro
+	static inline function buildEvent(input:String, level:OWLogLevel):Expr {
+		var name = Context.getLocalClass().get().name;
+		return macro {
+			var owLogTime = Date.now().getTime();
+			var event = overwatch.OWLogEvent.Message($v { name }, $v { level }, $v { input }, owLogTime );
+			overwatch.Log.binding.handleLogEvent(event);
+			var util = new overwatch.EventUtil(event);
+			util;
+		}
 	}
+	#end
 	
 }
 
 interface LogBinding {
-	function print(source:String, level:LogLevel, str:String):Void;
+	function handleLogEvent(evt:OWLogEvent):Void;
 }
 
 private class DefaultBinding implements LogBinding {
 	public inline function new(){}
-	public inline function print(source:String, level:LogLevel, str:String):Void {
+	public inline function handleLogEvent(evt:OWLogEvent):Void {
 		#if (neko || cpp)
-		Sys.stdout().writeString(level + "\t" + source+ " ->\t" + str + "\n");
+		switch(evt) {
+			case Message(className, level, value, time, meta):
+				Sys.stdout().writeString(time+"\t" + level + "\t" + className+ " ->\t" + value + "\n");
+		}
 		#else
-		trace(str);
+		switch(evt) {
+			case Message(className, level, value, time, meta):
+				trace(value);
+		}
 		#end
 	}
 }
