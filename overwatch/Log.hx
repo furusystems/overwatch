@@ -1,4 +1,5 @@
 package overwatch;
+import haxe.PosInfos;
 
 @:enum
 abstract OWLogLevel(Int) {
@@ -48,7 +49,9 @@ private class OWLogEvent {
 
 class Logger {
 	var name:String;
+	public var enabled:Bool;
 	public function new(owner:Dynamic) { 
+		enabled = true;
 		if (Std.is(owner, String)) {
 			this.name = owner; 
 		}else {
@@ -63,7 +66,7 @@ class Logger {
 		owEvent.timeStamp = Date.now().getTime();
 		owEvent.sessionIndex = Log.sessionIndex++;
 		owEvent.message = input;
-		Log.binding.handleLogEvent(owEvent);
+		if (enabled) Log.binding.handleLogEvent(owEvent);
 		return owEvent;
 	}
 	
@@ -91,7 +94,29 @@ class Log
 	static var sessionIndex:Int = 0;
 	public static var dateFormat:String = "%H:%M:%S";
 	public static var binding:LogBinding = new DefaultBinding();
-	
+	public static inline function println(str:String):Void {
+		#if flash
+			#if (fdb || native_trace)
+				untyped #if flash9 __global__["trace"] #else __trace__ #end(str);
+			#else
+				untyped flash.Boot.__trace(str);
+			#end
+		#elseif (neko || cpp)
+			untyped {
+				Sys.stdout().writeString(str+"\n");
+			}
+		#elseif js
+			untyped console.log(str);
+		#elseif php
+			php.Lib.println(str);
+		#elseif (cs || java)
+			#if cs
+			cs.system.Console.WriteLine(str);
+			#elseif java
+			untyped __java__("java.lang.System.out.println(str)");
+			#end
+		#end
+	}
 }
 
 interface LogBinding {
@@ -99,11 +124,9 @@ interface LogBinding {
 }
 
 private class DefaultBinding implements LogBinding {
-	public inline function new(){}
-	public inline function handleLogEvent(evt:OWLogEvent):Void {
-		#if (neko || cpp)
-		Sys.stdout().writeString(evt.toString() + "\n");
-		#else
-		#end
+	public inline function new() {
+	}
+	public function handleLogEvent(evt:OWLogEvent):Void {
+		Log.println(evt.toString());
 	}
 }
