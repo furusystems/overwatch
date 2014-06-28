@@ -1,7 +1,5 @@
 package overwatch;
-import haxe.macro.Context;
-import haxe.macro.Expr;
-import haxe.macro.ExprTools;
+import haxe.PosInfos;
 
 enum OWLogLevel {
 	DEBUG;
@@ -11,55 +9,61 @@ enum OWLogLevel {
 	FATAL;
 }
 
-enum OWLogEvent {
-	Message(className:String, level:OWLogLevel, value:String, time:Float, ?meta:Array<Dynamic>);
-}
-
-abstract EventUtil(OWLogEvent) from OWLogEvent {
-	public inline function new(evt:OWLogEvent) {
-		this = evt;
+class OWLogEvent {
+	public var sessionIndex:Int;
+	public var timeStamp:Float;
+	public var className:String;
+	public var message:String;
+	public var level:OWLogLevel;
+	public var meta:Null<Array<Dynamic>>;
+	public function new() {
 	}
-	public inline function addMeta(data:Dynamic):EventUtil {
-		{
-			var array:Array<Dynamic> = this.getParameters()[5];
-			if (array == null) {
-				this.getParameters()[5] = array = [];
-			}
-			array.push(data);
-		}
+	public inline function toString():String {
+		return sessionIndex + "\t" + DateTools.format(Date.fromTime(timeStamp), Log.dateFormat) + "\t" + level + "\t" + className+ " ->\t" + message;
+	}
+	public inline function addMeta(data:Dynamic):OWLogEvent {
+		if (meta == null) meta = [data];
+		else meta.push(data);
+		return this;
+	}
+	public inline function disposeMeta():OWLogEvent {
+		meta = null;
 		return this;
 	}
 }
+
 class Log
 {
+	public static var dateFormat:String = "%H:%M:%S";
+	static var sessionIndex:Int = 0;
+	static inline function buildEvent(input:String, level:OWLogLevel, ?pos:PosInfos):OWLogEvent {
+		var name:String = pos.className;
+		var owEvent = new OWLogEvent();
+		owEvent.className = name;
+		owEvent.level = level;
+		owEvent.timeStamp = Date.now().getTime();
+		owEvent.sessionIndex = sessionIndex++;
+		owEvent.message = input;
+		binding.handleLogEvent(owEvent);
+		return owEvent;
+	}
+	
 	public static var binding:LogBinding = new DefaultBinding();
-	macro public static function debug(input:Expr):Expr {
+	public static inline function debug(input:String):OWLogEvent {
 		return buildEvent(input, DEBUG);
 	}
-	macro public static function info(input:Expr):Expr {
+	public static inline function info(input:String):OWLogEvent {
 		return buildEvent(input, INFO);
 	}
-	macro public static function warn(input:Expr):Expr {
+	public static inline function warn(input:String):OWLogEvent {
 		return buildEvent(input, WARNING);
 	}
-	macro public static function error(input:Expr):Expr {
+	public static inline function error(input:String):OWLogEvent {
 		return buildEvent(input, ERROR);
 	}
-	macro public static function fatal(input:Expr):Expr {
+	public static inline function fatal(input:String):OWLogEvent {
 		return buildEvent(input, FATAL);
 	}
-	#if macro
-	static function buildEvent(input:Expr, level:OWLogLevel):Expr {
-		var name = Context.getLocalClass().get().name;
-			return macro {
-				var owLogTime = Date.now().getTime();
-				var event = overwatch.OWLogEvent.Message($v { name }, $v { level }, $input, owLogTime );
-				overwatch.Log.binding.handleLogEvent(event);
-				var util = new overwatch.EventUtil(event);
-				util;
-			}
-	}
-	#end
 	
 }
 
@@ -71,15 +75,8 @@ private class DefaultBinding implements LogBinding {
 	public inline function new(){}
 	public inline function handleLogEvent(evt:OWLogEvent):Void {
 		#if (neko || cpp)
-		switch(evt) {
-			case Message(className, level, value, time, meta):
-				Sys.stdout().writeString(time+"\t" + level + "\t" + className+ " ->\t" + value + "\n");
-		}
+		Sys.stdout().writeString(evt + "\n");
 		#else
-		switch(evt) {
-			case Message(className, level, value, time, meta):
-				trace(value);
-		}
 		#end
 	}
 }
