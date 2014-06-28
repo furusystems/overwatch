@@ -51,7 +51,6 @@ class Log
 	#if macro
 	static function buildEvent(input:Expr, level:OWLogLevel):Expr {
 		var name = Context.getLocalClass().get().name;
-		var str = ExprTools.toString(input);
 			return macro {
 				var owLogTime = Date.now().getTime();
 				var event = overwatch.OWLogEvent.Message($v { name }, $v { level }, $input, owLogTime );
