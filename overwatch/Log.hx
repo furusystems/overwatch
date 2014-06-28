@@ -1,25 +1,39 @@
 package overwatch;
-import haxe.PosInfos;
 
-enum OWLogLevel {
-	DEBUG;
-	INFO;
-	WARNING;
-	ERROR;
-	FATAL;
+@:enum
+abstract OWLogLevel(Int) {
+	var DEBUG = 0;
+	var INFO = 1;
+	var WARNING = 2;
+	var ERROR = 3;
+	var FATAL = 4;
 }
 
-class OWLogEvent {
+private class OWLogEvent {
 	public var sessionIndex:Int;
 	public var timeStamp:Float;
-	public var className:String;
+	public var loggerName:String;
 	public var message:String;
 	public var level:OWLogLevel;
 	public var meta:Null<Array<Dynamic>>;
 	public function new() {
 	}
 	public inline function toString():String {
-		return sessionIndex + "\t" + DateTools.format(Date.fromTime(timeStamp), Log.dateFormat) + "\t" + level + "\t" + className+ " ->\t" + message;
+		return DateTools.format(Date.fromTime(timeStamp), Log.dateFormat) + " " + levelToString(level) + "\t" + loggerName+ " :\t" + message;
+	}
+	function levelToString(level:OWLogLevel):String {
+		switch(level) {
+			case DEBUG:
+				return "DEBUG  ";
+			case INFO:
+				return "INFO   ";
+			case WARNING:
+				return "WARNING";
+			case ERROR:
+				return "ERROR  ";
+			case FATAL:
+				return "FATAL  ";
+		}
 	}
 	public inline function addMeta(data:Dynamic):OWLogEvent {
 		if (meta == null) meta = [data];
@@ -32,38 +46,51 @@ class OWLogEvent {
 	}
 }
 
-class Log
-{
-	public static var dateFormat:String = "%H:%M:%S";
-	static var sessionIndex:Int = 0;
-	static inline function buildEvent(input:String, level:OWLogLevel, ?pos:PosInfos):OWLogEvent {
-		var name:String = pos.className;
+class Logger {
+	var name:String;
+	public function new(owner:Dynamic) { 
+		if (Std.is(owner, String)) {
+			this.name = owner; 
+		}else {
+			this.name = Type.getClassName(owner);
+		}
+	}
+	
+	inline function buildEvent(input:String, level:OWLogLevel):OWLogEvent {
 		var owEvent = new OWLogEvent();
-		owEvent.className = name;
+		owEvent.loggerName = name;
 		owEvent.level = level;
 		owEvent.timeStamp = Date.now().getTime();
-		owEvent.sessionIndex = sessionIndex++;
+		owEvent.sessionIndex = Log.sessionIndex++;
 		owEvent.message = input;
-		binding.handleLogEvent(owEvent);
+		Log.binding.handleLogEvent(owEvent);
 		return owEvent;
 	}
 	
+	public inline function debug(input:String):OWLogEvent {
+		return buildEvent(input, OWLogLevel.DEBUG);
+	}
+	public inline function info(input:String):OWLogEvent {
+		return buildEvent(input, OWLogLevel.INFO);
+	}
+	public inline function warn(input:String):OWLogEvent {
+		return buildEvent(input, OWLogLevel.WARNING);
+	}
+	public inline function error(input:String):OWLogEvent {
+		return buildEvent(input, OWLogLevel.ERROR);
+	}
+	public inline function fatal(input:String):OWLogEvent {
+		return buildEvent(input, OWLogLevel.FATAL);
+	}
+}
+
+
+@:allow(overwatch)
+class Log
+{
+	static var sessionIndex:Int = 0;
+	public static var dateFormat:String = "%H:%M:%S";
 	public static var binding:LogBinding = new DefaultBinding();
-	public static inline function debug(input:String):OWLogEvent {
-		return buildEvent(input, DEBUG);
-	}
-	public static inline function info(input:String):OWLogEvent {
-		return buildEvent(input, INFO);
-	}
-	public static inline function warn(input:String):OWLogEvent {
-		return buildEvent(input, WARNING);
-	}
-	public static inline function error(input:String):OWLogEvent {
-		return buildEvent(input, ERROR);
-	}
-	public static inline function fatal(input:String):OWLogEvent {
-		return buildEvent(input, FATAL);
-	}
 	
 }
 
@@ -75,7 +102,7 @@ private class DefaultBinding implements LogBinding {
 	public inline function new(){}
 	public inline function handleLogEvent(evt:OWLogEvent):Void {
 		#if (neko || cpp)
-		Sys.stdout().writeString(evt + "\n");
+		Sys.stdout().writeString(evt.toString() + "\n");
 		#else
 		#end
 	}
